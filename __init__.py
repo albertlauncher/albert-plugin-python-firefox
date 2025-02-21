@@ -82,6 +82,27 @@ def get_bookmarks(places_db: Path):
         return []
 
 
+def get_history(places_db: Path):
+    """Get all history items from the places database"""
+    try:
+        with get_connection(places_db) as conn:
+            cursor = conn.cursor()
+
+            # Query history
+            cursor.execute("""
+                SELECT h.id, h.title, h.url
+                FROM moz_places h
+                WHERE h.hidden = 0
+                  AND h.url IS NOT NULL
+            """)
+
+            return cursor.fetchall()
+
+    except sqlite3.Error as e:
+        critical(f"Failed to read Firefox history: {str(e)}")
+        return []
+
+
 class Plugin(PluginInstance, IndexQueryHandler):
     def __init__(self):
         PluginInstance.__init__(self)
@@ -103,6 +124,9 @@ class Plugin(PluginInstance, IndexQueryHandler):
             self._current_profile_path = self.profiles[0]
             self.writeConfig("current_profile_path", self._current_profile_path)
 
+        # Initialize history indexing preference
+        self.index_history = self.readConfig("index_history", bool)
+
     def __del__(self):
         if self.thread and self.thread.is_alive():
             self.thread.join()
@@ -117,6 +141,16 @@ class Plugin(PluginInstance, IndexQueryHandler):
         self.writeConfig("current_profile_path", value)
         self.updateIndexItems()
 
+    @property
+    def index_history(self):
+        return self._index_history
+
+    @index_history.setter
+    def index_history(self, value):
+        self._index_history = value
+        self.writeConfig("index_history", value)
+        self.updateIndexItems()
+
     def configWidget(self):
         return [
             {
@@ -126,6 +160,14 @@ class Plugin(PluginInstance, IndexQueryHandler):
                 "items": self.profiles,
                 "widget_properties": {
                     "toolTip": "Select Firefox profile to search bookmarks from"
+                },
+            },
+            {
+                "type": "checkbox",
+                "property": "index_history",
+                "label": "Index Firefox History",
+                "widget_properties": {
+                    "toolTip": "Enable or disable indexing of Firefox history"
                 },
             }
         ]
@@ -156,5 +198,23 @@ class Plugin(PluginInstance, IndexQueryHandler):
 
             # Create searchable string for the bookmark
             index_items.append(IndexItem(item=item, string=f"{title} {url}".lower()))
+
+        if self.index_history:
+            history = get_history(places_db)
+            info(f"Found {len(history)} history items")
+            for id, title, url in history:
+                item = StandardItem(
+                    id=str(id),
+                    text=title if title else url,
+                    subtext=url,
+                    iconUrls=["xdg:firefox"],
+                    actions=[
+                        Action("open", "Open in Firefox", lambda u=url: openUrl(u)),
+                        Action("copy", "Copy URL", lambda u=url: setClipboardText(u)),
+                    ],
+                )
+
+                # Create searchable string for the history item
+                index_items.append(IndexItem(item=item, string=f"{title} {url}".lower()))
 
         self.setIndexItems(index_items)
