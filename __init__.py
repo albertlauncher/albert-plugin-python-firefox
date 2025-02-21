@@ -169,7 +169,7 @@ class Plugin(PluginInstance, IndexQueryHandler):
                 "widget_properties": {
                     "toolTip": "Enable or disable indexing of Firefox history"
                 },
-            }
+            },
         ]
 
     def updateIndexItems(self):
@@ -184,7 +184,12 @@ class Plugin(PluginInstance, IndexQueryHandler):
         info(f"Found {len(bookmarks)} bookmarks")
 
         index_items = []
+        seen_urls = set()
+
         for guid, title, url in bookmarks:
+            if url in seen_urls:
+                continue
+            seen_urls.add(url)
             item = StandardItem(
                 id=guid,
                 text=title if title else url,
@@ -203,6 +208,9 @@ class Plugin(PluginInstance, IndexQueryHandler):
             history = get_history(places_db)
             info(f"Found {len(history)} history items")
             for id, title, url in history:
+                if url in seen_urls:
+                    continue
+                seen_urls.add(url)
                 item = StandardItem(
                     id=str(id),
                     text=title if title else url,
@@ -215,6 +223,8 @@ class Plugin(PluginInstance, IndexQueryHandler):
                 )
 
                 # Create searchable string for the history item
-                index_items.append(IndexItem(item=item, string=f"{title} {url}".lower()))
+                index_items.append(
+                    IndexItem(item=item, string=f"{title} {url}".lower())
+                )
 
         self.setIndexItems(index_items)
