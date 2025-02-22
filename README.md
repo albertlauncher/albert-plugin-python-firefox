@@ -25,7 +25,7 @@ Albert will present the entries in frequency order: the more you use a bookmark,
 1. Make the plugin directory
 
 ```
-mkdir -p ~/.local/share/albert/python/plugins/firefox/
+mkdir -p ~/.local/share/albert/python/plugins
 ```
 
 2. Clone the repository
