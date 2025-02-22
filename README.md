@@ -6,19 +6,17 @@ Albert will present the entries in frequency order: the more you use a bookmark,
 
 ## Features
 
-- Open bookmarks and history from Firefox
-- Select the Profile to use in the Preferences
-- Enable or not the history search
+- 📚 Open bookmarks and history from Firefox
+- ✨ Display favicons for bookmarks
+- 🧑‍🤝‍🧑 Select the Profile to use in the Preferences
+- 🛗 Enable or not the history search
 
 ## TODO
 
 - [x] Index bookmarks
 - [x] Index history (with preferences)
 - [x] Select the profile to use
-- [ ] (maybe) Select many profiles to index
-- [ ] (complex) Favicon in the results (those are in another DB, need to extracted on disk...). 
-  - See [Krunner SQL query](https://github.com/KDE/plasma-workspace/blob/96df482d06b8764c4348a98bf0cdc1bae91ab0eb/runners/bookmarks/faviconfromblob.cpp#L48)
-  - See [Krunner download favicon](https://github.com/KDE/plasma-workspace/blob/96df482d06b8764c4348a98bf0cdc1bae91ab0eb/runners/bookmarks/faviconfromblob.cpp#L99)
+- [x] Display Bookmark favicons
 
 ## Setup
 
