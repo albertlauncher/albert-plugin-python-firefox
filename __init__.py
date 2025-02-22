@@ -125,7 +125,10 @@ class Plugin(PluginInstance, IndexQueryHandler):
             self.writeConfig("current_profile_path", self._current_profile_path)
 
         # Initialize history indexing preference
-        self.index_history = self.readConfig("index_history", bool)
+        self._index_history = self.readConfig("index_history", bool)
+        if self._index_history is None:
+            self._index_history = False
+            self.writeConfig("index_history", self._index_history)
 
     def __del__(self):
         if self.thread and self.thread.is_alive():
@@ -204,7 +207,7 @@ class Plugin(PluginInstance, IndexQueryHandler):
             # Create searchable string for the bookmark
             index_items.append(IndexItem(item=item, string=f"{title} {url}".lower()))
 
-        if self.index_history:
+        if self._index_history:
             history = get_history(places_db)
             info(f"Found {len(history)} history items")
             for id, title, url in history:
