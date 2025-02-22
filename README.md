@@ -42,4 +42,4 @@ git clone https://github.com/tomsquest/albert_plugin_firefox_bookmarks.git ~/.lo
 
 - [Stevenxxiu plugin](https://github.com/stevenxxiu/albert_firefox)
 - [Sagebind plugin](https://github.com/sagebind/dotfiles/blob/master/home.linux/.local/share/albert/python/plugins/firefoxbookmarks/__init__.py)
-- [Official but archived C++ plugin](https://github.com/albertlauncher/plugins)
+- [Official but archived C++ plugin](https://github.com/albertlauncher/plugins/tree/main/.archive/firefoxbookmarks)
