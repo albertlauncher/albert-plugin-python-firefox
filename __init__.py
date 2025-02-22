@@ -16,7 +16,7 @@ md_url = "https://github.com/tomsquest/albert_plugin_firefox_bookmarks"
 md_authors = "@tomsquest"
 md_lib_dependencies = ["sqlite3"]
 md_credits = ["@stevenxxiu", "@sagebind"]
-default_trigger = "f"
+default_trigger = "f "
 
 
 def get_firefox_root() -> Path:
