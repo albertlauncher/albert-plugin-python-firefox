@@ -194,7 +194,7 @@ class Plugin(PluginInstance, IndexQueryHandler):
                 id=guid,
                 text=title if title else url,
                 subtext=url,
-                iconUrls=["xdg:firefox"],
+                iconUrls=[f"file:{Path(__file__).parent}/firefox_bookmark.svg", "xdg:firefox"],
                 actions=[
                     Action("open", "Open in Firefox", lambda u=url: openUrl(u)),
                     Action("copy", "Copy URL", lambda u=url: setClipboardText(u)),
@@ -215,7 +215,7 @@ class Plugin(PluginInstance, IndexQueryHandler):
                     id=str(id),
                     text=title if title else url,
                     subtext=url,
-                    iconUrls=["xdg:firefox"],
+                    iconUrls=[f"file:{Path(__file__).parent}/firefox_history.svg", "xdg:firefox"],
                     actions=[
                         Action("open", "Open in Firefox", lambda u=url: openUrl(u)),
                         Action("copy", "Copy URL", lambda u=url: setClipboardText(u)),
