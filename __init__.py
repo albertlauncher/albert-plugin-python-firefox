@@ -126,7 +126,7 @@ def get_favicons_data(favicons_db: Path) -> dict[str, bytes]:
 
     except sqlite3.Error as e:
         warning(f"Failed to read favicon data: {str(e)}")
-        return []
+        return {}
 
 
 class Plugin(PluginInstance, IndexQueryHandler):
