@@ -258,12 +258,12 @@ class Plugin(PluginInstance, IndexQueryHandler):
         if self._index_history:
             history = get_history(places_db)
             info(f"Found {len(history)} history items")
-            for id, title, url in history:
+            for guid, title, url in history:
                 if url in seen_urls:
                     continue
                 seen_urls.add(url)
                 item = StandardItem(
-                    id=str(id),
+                    id=guid,
                     text=title if title else url,
                     subtext=url,
                     iconUrls=[
