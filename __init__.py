@@ -91,12 +91,14 @@ def get_history(places_db: Path) -> List[Tuple[str, str, str]]:
         with get_connection(places_db) as conn:
             cursor = conn.cursor()
 
-            # Query history
+            # Query history excluding bookmarks
             cursor.execute("""
                 SELECT place.guid, place.title, place.url
                 FROM moz_places place
+                  LEFT JOIN moz_bookmarks bookmark ON place.id = bookmark.fk
                 WHERE place.hidden = 0
                   AND place.url IS NOT NULL
+                  AND bookmark.id IS NULL
             """)
 
             return cursor.fetchall()
@@ -112,11 +114,12 @@ def get_favicons_data(favicons_db: Path) -> dict[str, bytes]:
         with get_connection(favicons_db) as conn:
             cursor = conn.cursor()
 
+            # Query favicons
             cursor.execute("""
                 SELECT moz_pages_w_icons.page_url_hash, moz_icons.data
                 FROM moz_icons
-                INNER JOIN moz_icons_to_pages ON moz_icons.id = moz_icons_to_pages.icon_id
-                INNER JOIN moz_pages_w_icons ON moz_icons_to_pages.page_id = moz_pages_w_icons.id
+                  INNER JOIN moz_icons_to_pages ON moz_icons.id = moz_icons_to_pages.icon_id
+                  INNER JOIN moz_pages_w_icons ON moz_icons_to_pages.page_id = moz_pages_w_icons.id
             """)
 
             return {row[0]: row[1] for row in cursor.fetchall()}
