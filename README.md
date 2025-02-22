@@ -40,6 +40,8 @@ git clone https://github.com/tomsquest/albert_plugin_firefox_bookmarks.git ~/.lo
 
 ![plugin_settings.png](plugin_settings.png)
 
+5. The default trigger is `f` (for Firefox), so start typing `f` in Albert to see your bookmarks and history
+
 ## Alternatives
 
 - [Stevenxxiu plugin](https://github.com/stevenxxiu/albert_firefox)
