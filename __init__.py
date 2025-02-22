@@ -3,7 +3,7 @@ import sqlite3
 import threading
 from contextlib import contextmanager
 from pathlib import Path
-from typing import List
+from typing import List, Union, Tuple
 
 from albert import *
 
@@ -59,7 +59,7 @@ def get_connection(db_path: Path):
         conn.close()
 
 
-def get_bookmarks(places_db: Path):
+def get_bookmarks(places_db: Path) -> List[Tuple[str, str, str, str]]:
     """Get all bookmarks from the places database"""
     try:
         with get_connection(places_db) as conn:
@@ -67,7 +67,7 @@ def get_bookmarks(places_db: Path):
 
             # Query bookmarks
             cursor.execute("""
-                SELECT bookmark.guid, bookmark.title, place.url
+                SELECT bookmark.guid, bookmark.title, place.url, place.url_hash
                 FROM moz_bookmarks bookmark
                   JOIN moz_places place ON place.id = bookmark.fk
                 WHERE bookmark.type = 1 -- 1 = bookmark
@@ -82,7 +82,7 @@ def get_bookmarks(places_db: Path):
         return []
 
 
-def get_history(places_db: Path):
+def get_history(places_db: Path) -> List[Tuple[str, str, str]]:
     """Get all history items from the places database"""
     try:
         with get_connection(places_db) as conn:
@@ -90,10 +90,10 @@ def get_history(places_db: Path):
 
             # Query history
             cursor.execute("""
-                SELECT h.id, h.title, h.url
-                FROM moz_places h
-                WHERE h.hidden = 0
-                  AND h.url IS NOT NULL
+                SELECT place.guid, place.title, place.url
+                FROM moz_places place
+                WHERE place.hidden = 0
+                  AND place.url IS NOT NULL
             """)
 
             return cursor.fetchall()
@@ -101,6 +101,30 @@ def get_history(places_db: Path):
     except sqlite3.Error as e:
         critical(f"Failed to read Firefox history: {str(e)}")
         return []
+
+
+def get_favicon_data(favicons_db: Path, url_hash: str) -> Union[bytes, None]:
+    """Get favicon data for a given URL from the favicons database"""
+    try:
+        with get_connection(favicons_db) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT moz_icons.data
+                FROM moz_icons
+                  INNER JOIN moz_icons_to_pages ON moz_icons.id = moz_icons_to_pages.icon_id
+                  INNER JOIN moz_pages_w_icons ON moz_icons_to_pages.page_id = moz_pages_w_icons.id
+                WHERE moz_pages_w_icons.page_url_hash = ?
+                LIMIT 1
+            """,
+                (url_hash,),
+            )
+            result = cursor.fetchone()
+            if result:
+                return result[0]
+    except sqlite3.Error as e:
+        warning(f"Failed to read favicon data: {str(e)}")
+    return None
 
 
 class Plugin(PluginInstance, IndexQueryHandler):
@@ -183,21 +207,44 @@ class Plugin(PluginInstance, IndexQueryHandler):
 
     def update_index_items_task(self):
         places_db = get_firefox_root() / self.current_profile_path / "places.sqlite"
+        favicons_db = get_firefox_root() / self.current_profile_path / "favicons.sqlite"
+
         bookmarks = get_bookmarks(places_db)
         info(f"Found {len(bookmarks)} bookmarks")
 
         index_items = []
         seen_urls = set()
 
-        for guid, title, url in bookmarks:
+        # Drop and recreate favicons directory
+        favicons_location = self.dataLocation / "favicons"
+        if favicons_location.exists():
+            for f in favicons_location.iterdir():
+                f.unlink()
+        favicons_location.mkdir(exist_ok=True, parents=True)
+
+        for guid, title, url, url_hash in bookmarks:
             if url in seen_urls:
                 continue
             seen_urls.add(url)
+
+            # Search and store favicons
+            favicon_data = get_favicon_data(favicons_db, url_hash)
+            if favicon_data:
+                favicon_path = favicons_location / f"favicon_{guid}.png"
+                with open(favicon_path, "wb") as f:
+                    f.write(favicon_data)
+                icon_urls = [f"file:{favicon_path}", "xdg:firefox"]
+            else:
+                icon_urls = [
+                    f"file:{Path(__file__).parent}/firefox_bookmark.svg",
+                    "xdg:firefox",
+                ]
+
             item = StandardItem(
                 id=guid,
                 text=title if title else url,
                 subtext=url,
-                iconUrls=[f"file:{Path(__file__).parent}/firefox_bookmark.svg", "xdg:firefox"],
+                iconUrls=icon_urls,
                 actions=[
                     Action("open", "Open in Firefox", lambda u=url: openUrl(u)),
                     Action("copy", "Copy URL", lambda u=url: setClipboardText(u)),
