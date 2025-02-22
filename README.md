@@ -32,6 +32,10 @@ mkdir -p ~/.local/share/albert/python/plugins/firefox/
 git clone https://github.com/tomsquest/albert_plugin_firefox_bookmarks.git ~/.local/share/albert/python/plugins/firefox_bookmarks
 ```
 
+3. Enable the plugin in `Settings > Plugins` and tick `Firefox Bookmarks`
+
+4. Configure the plugin by picking the Firefox profile to use and if you want to search in history
+
 ## Alternatives
 
 - [Stevenxxiu plugin](https://github.com/stevenxxiu/albert_firefox)
