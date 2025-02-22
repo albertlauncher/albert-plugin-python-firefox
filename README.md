@@ -29,7 +29,7 @@ mkdir -p ~/.local/share/albert/python/plugins/firefox/
 2. Clone the repository
 
 ```
-git clone https://github.com/tomsquest/albert_plugin_firefox_bookmarks.git ~/.local/share/albert/python/plugins
+git clone https://github.com/tomsquest/albert_plugin_firefox_bookmarks.git ~/.local/share/albert/python/plugins/firefox_bookmarks
 ```
 
 ## Alternatives
