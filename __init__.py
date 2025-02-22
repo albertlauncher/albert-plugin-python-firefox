@@ -3,7 +3,7 @@ import sqlite3
 import threading
 from contextlib import contextmanager
 from pathlib import Path
-from typing import List, Union, Tuple
+from typing import List, Tuple
 
 from albert import *
 
@@ -103,28 +103,24 @@ def get_history(places_db: Path) -> List[Tuple[str, str, str]]:
         return []
 
 
-def get_favicon_data(favicons_db: Path, url_hash: str) -> Union[bytes, None]:
-    """Get favicon data for a given URL from the favicons database"""
+def get_favicons_data(favicons_db: Path) -> dict[str, bytes]:
+    """Get all favicon data from the favicons database"""
     try:
         with get_connection(favicons_db) as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT moz_icons.data
+
+            cursor.execute("""
+                SELECT moz_pages_w_icons.page_url_hash, moz_icons.data
                 FROM moz_icons
-                  INNER JOIN moz_icons_to_pages ON moz_icons.id = moz_icons_to_pages.icon_id
-                  INNER JOIN moz_pages_w_icons ON moz_icons_to_pages.page_id = moz_pages_w_icons.id
-                WHERE moz_pages_w_icons.page_url_hash = ?
-                LIMIT 1
-            """,
-                (url_hash,),
-            )
-            result = cursor.fetchone()
-            if result:
-                return result[0]
+                INNER JOIN moz_icons_to_pages ON moz_icons.id = moz_icons_to_pages.icon_id
+                INNER JOIN moz_pages_w_icons ON moz_icons_to_pages.page_id = moz_pages_w_icons.id
+            """)
+
+            return {row[0]: row[1] for row in cursor.fetchall()}
+
     except sqlite3.Error as e:
         warning(f"Failed to read favicon data: {str(e)}")
-    return None
+        return []
 
 
 class Plugin(PluginInstance, IndexQueryHandler):
@@ -212,9 +208,6 @@ class Plugin(PluginInstance, IndexQueryHandler):
         bookmarks = get_bookmarks(places_db)
         info(f"Found {len(bookmarks)} bookmarks")
 
-        index_items = []
-        seen_urls = set()
-
         # Drop and recreate favicons directory
         favicons_location = self.dataLocation / "favicons"
         if favicons_location.exists():
@@ -222,13 +215,18 @@ class Plugin(PluginInstance, IndexQueryHandler):
                 f.unlink()
         favicons_location.mkdir(exist_ok=True, parents=True)
 
+        favicons = get_favicons_data(favicons_db)
+
+        index_items = []
+        seen_urls = set()
+
         for guid, title, url, url_hash in bookmarks:
             if url in seen_urls:
                 continue
             seen_urls.add(url)
 
             # Search and store favicons
-            favicon_data = get_favicon_data(favicons_db, url_hash)
+            favicon_data = favicons.get(url_hash)
             if favicon_data:
                 favicon_path = favicons_location / f"favicon_{guid}.png"
                 with open(favicon_path, "wb") as f:
@@ -265,7 +263,10 @@ class Plugin(PluginInstance, IndexQueryHandler):
                     id=str(id),
                     text=title if title else url,
                     subtext=url,
-                    iconUrls=[f"file:{Path(__file__).parent}/firefox_history.svg", "xdg:firefox"],
+                    iconUrls=[
+                        f"file:{Path(__file__).parent}/firefox_history.svg",
+                        "xdg:firefox",
+                    ],
                     actions=[
                         Action("open", "Open in Firefox", lambda u=url: openUrl(u)),
                         Action("copy", "Copy URL", lambda u=url: setClipboardText(u)),
