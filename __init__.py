@@ -18,6 +18,9 @@ md_lib_dependencies = ["sqlite3"]
 md_credits = ["@stevenxxiu", "@sagebind"]
 default_trigger = "f "
 
+firefox_bookmark_icon = Path(__file__).parent / "firefox_bookmark.svg"
+firefox_history_icon = Path(__file__).parent / "firefox_history.svg"
+
 
 def get_firefox_root() -> Path:
     """Get the Firefox root directory"""
@@ -234,7 +237,7 @@ class Plugin(PluginInstance, IndexQueryHandler):
                 icon_urls = [f"file:{favicon_path}", "xdg:firefox"]
             else:
                 icon_urls = [
-                    f"file:{Path(__file__).parent}/firefox_bookmark.svg",
+                    f"file:{firefox_bookmark_icon}",
                     "xdg:firefox",
                 ]
 
@@ -264,7 +267,7 @@ class Plugin(PluginInstance, IndexQueryHandler):
                     text=title if title else url,
                     subtext=url,
                     iconUrls=[
-                        f"file:{Path(__file__).parent}/firefox_history.svg",
+                        f"file:{firefox_history_icon}",
                         "xdg:firefox",
                     ],
                     actions=[
