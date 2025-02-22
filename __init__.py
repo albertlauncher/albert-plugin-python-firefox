@@ -41,7 +41,11 @@ def get_available_profiles() -> List[str]:
 
         for section in config.sections():
             if section.startswith("Profile") and "Path" in config[section]:
-                profiles.append(config[section]["Path"])
+                profile_path = firefox_root / config[section]["Path"]
+                if (profile_path / "places.sqlite").exists() and (
+                        profile_path / "favicons.sqlite"
+                ).exists():
+                    profiles.append(config[section]["Path"])
 
     except Exception as e:
         warning(f"Failed to read Firefox profiles: {str(e)}")
