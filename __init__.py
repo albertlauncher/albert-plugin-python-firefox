@@ -7,7 +7,7 @@ from typing import List, Tuple
 
 from albert import *
 
-md_iid = "2.3"
+md_iid = "3.0"
 md_version = "1.0"
 md_name = "Firefox Bookmarks"
 md_description = "Access Firefox bookmarks"
@@ -16,7 +16,7 @@ md_url = "https://github.com/tomsquest/albert_plugin_firefox_bookmarks"
 md_authors = "@tomsquest"
 md_lib_dependencies = ["sqlite3"]
 md_credits = ["@stevenxxiu", "@sagebind"]
-default_trigger = "f "
+
 
 firefox_bookmark_icon = Path(__file__).parent / "firefox_bookmark.svg"
 firefox_history_icon = Path(__file__).parent / "firefox_history.svg"
@@ -43,7 +43,7 @@ def get_available_profiles() -> List[str]:
             if section.startswith("Profile") and "Path" in config[section]:
                 profile_path = firefox_root / config[section]["Path"]
                 if (profile_path / "places.sqlite").exists() and (
-                        profile_path / "favicons.sqlite"
+                    profile_path / "favicons.sqlite"
                 ).exists():
                     profiles.append(config[section]["Path"])
 
@@ -136,9 +136,7 @@ def get_favicons_data(favicons_db: Path) -> dict[str, bytes]:
 class Plugin(PluginInstance, IndexQueryHandler):
     def __init__(self):
         PluginInstance.__init__(self)
-        IndexQueryHandler.__init__(
-            self, self.id, self.name, self.description, defaultTrigger=default_trigger
-        )
+        IndexQueryHandler.__init__(self)
         self.thread = None
 
         # Get available profiles
@@ -163,6 +161,12 @@ class Plugin(PluginInstance, IndexQueryHandler):
     def __del__(self):
         if self.thread and self.thread.is_alive():
             self.thread.join()
+
+    def extensions(self):
+        return [self]
+
+    def defaultTrigger(self):
+        return "f "
 
     @property
     def current_profile_path(self):
@@ -212,18 +216,20 @@ class Plugin(PluginInstance, IndexQueryHandler):
         self.thread.start()
 
     def update_index_items_task(self):
-        places_db = get_firefox_root() / self.current_profile_path / "places.sqlite"
-        favicons_db = get_firefox_root() / self.current_profile_path / "favicons.sqlite"
+        firefox_root = get_firefox_root()
+        places_db = firefox_root / self.current_profile_path / "places.sqlite"
+        favicons_db = firefox_root / self.current_profile_path / "favicons.sqlite"
 
         bookmarks = get_bookmarks(places_db)
         info(f"Found {len(bookmarks)} bookmarks")
 
-        # Drop and recreate favicons directory
-        favicons_location = self.dataLocation / "favicons"
-        if favicons_location.exists():
-            for f in favicons_location.iterdir():
-                f.unlink()
+        # Create favicons directory if it doesn't exist
+        favicons_location = Path(self.dataLocation()) / "favicons"
         favicons_location.mkdir(exist_ok=True, parents=True)
+
+        # Drop existing favicons
+        for f in favicons_location.glob("*"):
+            f.unlink()
 
         favicons = get_favicons_data(favicons_db)
 
