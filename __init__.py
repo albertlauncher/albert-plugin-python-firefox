@@ -242,18 +242,15 @@ class Plugin(PluginInstance, IndexQueryHandler):
                 continue
             seen_urls.add(url)
 
-            # Search and store favicons
+            # Search and store the favicon if it exists
             favicon_data = favicons.get(url_hash)
+            icon_urls = ["xdg:firefox", f"file:{firefox_bookmark_icon}"]
             if favicon_data:
                 favicon_path = favicons_location / f"favicon_{guid}.png"
                 with open(favicon_path, "wb") as f:
                     f.write(favicon_data)
-                icon_urls = [f"file:{favicon_path}", "xdg:firefox"]
-            else:
-                icon_urls = [
-                    f"file:{firefox_bookmark_icon}",
-                    "xdg:firefox",
-                ]
+                # prepend the favicon path to icon_urls
+                icon_urls = [f"file:{favicon_path}"] + icon_urls
 
             item = StandardItem(
                 id=guid,
