@@ -11,32 +11,11 @@ Albert will present the entries in frequency order: the more you use a bookmark,
 - 🧑‍🤝‍🧑 Select the Profile to use in the Preferences
 - 🛗 Enable or not the history search
 
-## TODO
-
-- [x] Index bookmarks
-- [x] Index history (with preferences)
-- [x] Select the profile to use
-- [x] Display Bookmark favicons
-
 ## Setup
 
-1. Make the plugin directory
-
-```
-mkdir -p ~/.local/share/albert/python/plugins
-```
-
-2. Clone the repository
-
-```
-git clone https://github.com/tomsquest/albert_plugin_firefox_bookmarks.git ~/.local/share/albert/python/plugins/firefox_bookmarks
-```
-
-3. Enable the plugin in `Settings > Plugins` and tick `Firefox Bookmarks`
-
-4. Configure the plugin by picking the Firefox profile to use and if you want to search in history
-
-5. The default trigger is `f` (for Firefox), so start typing `f` in Albert to see your bookmarks and history
+1. Enable the plugin in `Settings > Plugins` and tick `Firefox Bookmarks`
+2. Configure the plugin by picking the Firefox profile to use and if you want to search in history
+3. The default trigger is `f<space>` ("f" for Firefox), so start typing `f ` in Albert to see your bookmarks and history
 
 ## Alternatives
 
