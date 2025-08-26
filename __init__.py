@@ -9,12 +9,13 @@ from albert import *
 
 md_iid = "3.0"
 md_version = "1.0"
-md_name = "Firefox Bookmarks and History"
+md_name = "Firefox"
 md_description = "Access Firefox bookmarks and history"
 md_license = "MIT"
 md_url = "https://github.com/tomsquest/albert_plugin_firefox_bookmarks"
-md_authors = "@tomsquest"
-md_lib_dependencies = []
+md_readme_url = "https://github.com/albertlauncher/albert-plugin-python-firefox/blob/main/README.md"
+md_authors = ["@tomsquest"]
+md_maintainers = ["@tomsquest"]
 md_credits = ["@stevenxxiu", "@sagebind"]
 
 
