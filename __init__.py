@@ -1,4 +1,5 @@
 import configparser
+import platform
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -23,15 +24,9 @@ firefox_bookmark_icon = Path(__file__).parent / "firefox_bookmark.svg"
 firefox_history_icon = Path(__file__).parent / "firefox_history.svg"
 
 
-def get_firefox_root() -> Path:
-    """Get the Firefox root directory"""
-    return Path.home() / ".mozilla" / "firefox"
-
-
-def get_available_profiles() -> List[str]:
+def get_available_profiles(firefox_root: Path) -> List[str]:
     """Get list of available Firefox profiles from profiles.ini"""
     profiles = []
-    firefox_root = get_firefox_root()
 
     if not firefox_root.exists():
         return profiles
@@ -140,11 +135,19 @@ class Plugin(PluginInstance, IndexQueryHandler):
         IndexQueryHandler.__init__(self)
         self.thread = None
 
+        # Get the Firefox root directory
+        match platform.system():
+            case "Darwin":
+                self.firefox_data_dir = Path.home() / "Library" / "Application Support" / "Firefox"
+            case "Linux":
+                self.firefox_data_dir = Path.home() / ".mozilla" / "firefox"
+            case _:
+                raise NotImplementedError(f"Unsupported platform: {platform.system()}")
+
         # Get available profiles
-        self.profiles = get_available_profiles()
+        self.profiles = get_available_profiles(self.firefox_data_dir)
         if not self.profiles:
-            critical("No Firefox profiles found")
-            return
+            raise RuntimeError("No Firefox profiles found")
 
         # Initialize profile selection
         self._current_profile_path = self.readConfig("current_profile_path", str)
@@ -217,9 +220,8 @@ class Plugin(PluginInstance, IndexQueryHandler):
         self.thread.start()
 
     def update_index_items_task(self):
-        firefox_root = get_firefox_root()
-        places_db = firefox_root / self.current_profile_path / "places.sqlite"
-        favicons_db = firefox_root / self.current_profile_path / "favicons.sqlite"
+        places_db = self.firefox_data_dir / self.current_profile_path / "places.sqlite"
+        favicons_db = self.firefox_data_dir / self.current_profile_path / "favicons.sqlite"
 
         bookmarks = get_bookmarks(places_db)
         info(f"Found {len(bookmarks)} bookmarks")
