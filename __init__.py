@@ -55,7 +55,9 @@ def get_connection(db_path: Path):
     if not db_path.exists():
         raise FileNotFoundError(f"Places database not found at {db_path}")
 
-    conn = sqlite3.connect(f"file:{db_path}?immutable=1", uri=True)
+    # conn = sqlite3.connect(f"file:{db_path}?immutable=1", uri=True)  // Does not read from WAL
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+
     try:
         yield conn
     finally:
