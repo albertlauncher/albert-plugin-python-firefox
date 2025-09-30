@@ -10,7 +10,7 @@ from typing import List, Tuple
 
 from albert import *
 
-md_iid = "3.0"
+md_iid = "4.0"
 md_version = "1.0"
 md_name = "Firefox"
 md_description = "Access Firefox bookmarks and history"
@@ -20,10 +20,6 @@ md_readme_url = "https://github.com/albertlauncher/albert-plugin-python-firefox/
 md_authors = ["@tomsquest"]
 md_maintainers = ["@tomsquest"]
 md_credits = ["@stevenxxiu", "@sagebind"]
-
-
-firefox_bookmark_icon = Path(__file__).parent / "firefox_bookmark.svg"
-firefox_history_icon = Path(__file__).parent / "firefox_history.svg"
 
 
 def get_available_profiles(firefox_root: Path) -> List[str]:
@@ -165,8 +161,10 @@ class Plugin(PluginInstance, IndexQueryHandler):
         match platform.system():
             case "Darwin":
                 self.firefox_data_dir = Path.home() / "Library" / "Application Support" / "Firefox"
+                self.firefox_icon_factory = lambda: makeFileTypeIcon("/Applications/Firefox.app")
             case "Linux":
                 self.firefox_data_dir = Path.home() / ".mozilla" / "firefox"
+                self.firefox_icon_factory = lambda: makeThemeIcon("firefox")
             case _:
                 raise NotImplementedError(f"Unsupported platform: {platform.system()}")
 
@@ -272,19 +270,22 @@ class Plugin(PluginInstance, IndexQueryHandler):
 
             # Search and store the favicon if it exists
             favicon_data = favicons.get(url_hash)
-            icon_urls = ["xdg:firefox", f"file:{firefox_bookmark_icon}"]
             if favicon_data:
                 favicon_path = favicons_location / f"favicon_{guid}.png"
                 with open(favicon_path, "wb") as f:
                     f.write(favicon_data)
-                # prepend the favicon path to icon_urls
-                icon_urls = [f"file:{favicon_path}"] + icon_urls
-
+                icon_factory = lambda p=favicon_path: makeComposedIcon(self.firefox_icon_factory(),
+                                                                       makeIconifiedIcon(makeImageIcon(p)),
+                                                                       1.0, .7)
+            else:
+                icon_factory = lambda p=favicon_path: makeComposedIcon(self.firefox_icon_factory(),
+                                                                       makeGraphemeIcon("🌐"),
+                                                                       1.0, .7)
             item = StandardItem(
                 id=guid,
                 text=title if title else url,
                 subtext=url,
-                iconUrls=icon_urls,
+                icon_factory=icon_factory,
                 actions=[
                     Action("open", "Open in Firefox", lambda u=url: openUrl(u)),
                     Action("copy", "Copy URL", lambda u=url: setClipboardText(u)),
@@ -305,10 +306,7 @@ class Plugin(PluginInstance, IndexQueryHandler):
                     id=guid,
                     text=title if title else url,
                     subtext=url,
-                    iconUrls=[
-                        f"file:{firefox_history_icon}",
-                        "xdg:firefox",
-                    ],
+                    icon_factory=lambda: makeComposedIcon(self.firefox_icon_factory(), makeGraphemeIcon("🕘"), 1.0),
                     actions=[
                         Action("open", "Open in Firefox", lambda u=url: openUrl(u)),
                         Action("copy", "Copy URL", lambda u=url: setClipboardText(u)),
