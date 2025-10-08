@@ -1,6 +1,8 @@
 import configparser
 import platform
+import shutil
 import sqlite3
+import tempfile
 import threading
 from contextlib import contextmanager
 from pathlib import Path
@@ -14,7 +16,9 @@ md_name = "Firefox"
 md_description = "Access Firefox bookmarks and history"
 md_license = "MIT"
 md_url = "https://github.com/tomsquest/albert_plugin_firefox_bookmarks"
-md_readme_url = "https://github.com/albertlauncher/albert-plugin-python-firefox/blob/main/README.md"
+md_readme_url = (
+    "https://github.com/albertlauncher/albert-plugin-python-firefox/blob/main/README.md"
+)
 md_authors = ["@tomsquest"]
 md_maintainers = ["@tomsquest"]
 md_credits = ["@stevenxxiu", "@sagebind"]
@@ -51,17 +55,46 @@ def get_available_profiles(firefox_root: Path) -> List[str]:
 
 @contextmanager
 def get_connection(db_path: Path):
-    """Create a connection to the places database with read-only access"""
+    """Create a connection to the places database with read-only access.
+
+    Copies the database files to a temporary directory to avoid lock issues
+    when Firefox is running.
+    """
     if not db_path.exists():
         raise FileNotFoundError(f"Places database not found at {db_path}")
 
-    # conn = sqlite3.connect(f"file:{db_path}?immutable=1", uri=True)  // Does not read from WAL
-    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-
+    # Create a temporary directory for the database copy
+    temp_dir = None
     try:
-        yield conn
+        temp_dir = tempfile.mkdtemp(prefix="firefox_db_")
+        temp_dir_path = Path(temp_dir)
+
+        # Copy the main database file
+        temp_db_path = temp_dir_path / db_path.name
+        shutil.copy2(db_path, temp_db_path)
+
+        # Copy WAL file if it exists (Write-Ahead Logging)
+        wal_path = db_path.parent / f"{db_path.name}-wal"
+        if wal_path.exists():
+            shutil.copy2(wal_path, temp_dir_path / f"{db_path.name}-wal")
+
+        # Copy SHM file if it exists (Shared Memory)
+        shm_path = db_path.parent / f"{db_path.name}-shm"
+        if shm_path.exists():
+            shutil.copy2(shm_path, temp_dir_path / f"{db_path.name}-shm")
+
+        # Connect to the copied database
+        conn = sqlite3.connect(temp_db_path)
+
+        try:
+            yield conn
+        finally:
+            conn.close()
+
     finally:
-        conn.close()
+        # Clean up the temporary directory
+        if temp_dir and Path(temp_dir).exists():
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def get_bookmarks(places_db: Path) -> List[Tuple[str, str, str, str]]:
@@ -140,7 +173,9 @@ class Plugin(PluginInstance, IndexQueryHandler):
         # Get the Firefox root directory
         match platform.system():
             case "Darwin":
-                self.firefox_data_dir = Path.home() / "Library" / "Application Support" / "Firefox"
+                self.firefox_data_dir = (
+                    Path.home() / "Library" / "Application Support" / "Firefox"
+                )
             case "Linux":
                 self.firefox_data_dir = Path.home() / ".mozilla" / "firefox"
             case _:
@@ -223,7 +258,9 @@ class Plugin(PluginInstance, IndexQueryHandler):
 
     def update_index_items_task(self):
         places_db = self.firefox_data_dir / self.current_profile_path / "places.sqlite"
-        favicons_db = self.firefox_data_dir / self.current_profile_path / "favicons.sqlite"
+        favicons_db = (
+            self.firefox_data_dir / self.current_profile_path / "favicons.sqlite"
+        )
 
         bookmarks = get_bookmarks(places_db)
         info(f"Found {len(bookmarks)} bookmarks")
