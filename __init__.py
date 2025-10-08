@@ -64,11 +64,10 @@ def get_connection(db_path: Path):
         raise FileNotFoundError(f"Places database not found at {db_path}")
 
     # Create a temporary directory for the database copy
-    temp_dir = None
-    try:
-        temp_dir = tempfile.mkdtemp(prefix="firefox_db_")
-        temp_dir_path = Path(temp_dir)
+    temp_dir = tempfile.mkdtemp(prefix="albert_plugin_firefox_db_")
+    temp_dir_path = Path(temp_dir)
 
+    try:
         # Copy the main database file and all related files (WAL, SHM, etc.)
         # using glob pattern to catch all associated files
         for file_path in db_path.parent.glob(f"{db_path.name}*"):
@@ -82,11 +81,9 @@ def get_connection(db_path: Path):
             yield conn
         finally:
             conn.close()
-
     finally:
         # Clean up the temporary directory
-        if temp_dir and Path(temp_dir).exists():
-            shutil.rmtree(temp_dir, ignore_errors=True)
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def get_bookmarks(places_db: Path) -> List[Tuple[str, str, str, str]]:
