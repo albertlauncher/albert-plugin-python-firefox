@@ -16,9 +16,7 @@ md_name = "Firefox"
 md_description = "Access Firefox bookmarks and history"
 md_license = "MIT"
 md_url = "https://github.com/tomsquest/albert_plugin_firefox_bookmarks"
-md_readme_url = (
-    "https://github.com/albertlauncher/albert-plugin-python-firefox/blob/main/README.md"
-)
+md_readme_url = "https://github.com/albertlauncher/albert-plugin-python-firefox/blob/main/README.md"
 md_authors = ["@tomsquest"]
 md_maintainers = ["@tomsquest"]
 md_credits = ["@stevenxxiu", "@sagebind"]
@@ -165,9 +163,7 @@ class Plugin(PluginInstance, IndexQueryHandler):
         # Get the Firefox root directory
         match platform.system():
             case "Darwin":
-                self.firefox_data_dir = (
-                    Path.home() / "Library" / "Application Support" / "Firefox"
-                )
+                self.firefox_data_dir = Path.home() / "Library" / "Application Support" / "Firefox"
             case "Linux":
                 self.firefox_data_dir = Path.home() / ".mozilla" / "firefox"
             case _:
@@ -250,9 +246,7 @@ class Plugin(PluginInstance, IndexQueryHandler):
 
     def update_index_items_task(self):
         places_db = self.firefox_data_dir / self.current_profile_path / "places.sqlite"
-        favicons_db = (
-            self.firefox_data_dir / self.current_profile_path / "favicons.sqlite"
-        )
+        favicons_db = self.firefox_data_dir / self.current_profile_path / "favicons.sqlite"
 
         bookmarks = get_bookmarks(places_db)
         info(f"Found {len(bookmarks)} bookmarks")
