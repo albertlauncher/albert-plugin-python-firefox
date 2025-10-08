@@ -66,9 +66,11 @@ def get_connection(db_path: Path):
     temp_dir_path = Path(temp_dir)
 
     try:
-        # Copy the main database file and all related files (WAL, SHM, etc.)
-        for file_path in db_path.parent.glob(f"{db_path.name}*"):
-            shutil.copy2(file_path, temp_dir_path / file_path.name)
+        # Copy the main database file and its auxiliary files (WAL, SHM)
+        for suffix in ["", "-wal", "-shm"]:
+            src_file = db_path.parent / f"{db_path.name}{suffix}"
+            if src_file.exists():
+                shutil.copy2(src_file, temp_dir_path / src_file.name)
 
         # Connect to the copied database
         temp_db_path = temp_dir_path / db_path.name
