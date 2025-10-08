@@ -78,6 +78,9 @@ def get_connection(db_path: Path):
         conn = sqlite3.connect(temp_db_path)
 
         try:
+            # Integrate possible changes in wal files
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+
             yield conn
         finally:
             conn.close()
