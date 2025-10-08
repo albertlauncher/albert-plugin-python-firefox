@@ -67,7 +67,6 @@ def get_connection(db_path: Path):
 
     try:
         # Copy the main database file and all related files (WAL, SHM, etc.)
-        # using glob pattern to catch all associated files
         for file_path in db_path.parent.glob(f"{db_path.name}*"):
             shutil.copy2(file_path, temp_dir_path / file_path.name)
 
