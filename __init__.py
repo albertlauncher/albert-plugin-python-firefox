@@ -69,21 +69,13 @@ def get_connection(db_path: Path):
         temp_dir = tempfile.mkdtemp(prefix="firefox_db_")
         temp_dir_path = Path(temp_dir)
 
-        # Copy the main database file
-        temp_db_path = temp_dir_path / db_path.name
-        shutil.copy2(db_path, temp_db_path)
-
-        # Copy WAL file if it exists (Write-Ahead Logging)
-        wal_path = db_path.parent / f"{db_path.name}-wal"
-        if wal_path.exists():
-            shutil.copy2(wal_path, temp_dir_path / f"{db_path.name}-wal")
-
-        # Copy SHM file if it exists (Shared Memory)
-        shm_path = db_path.parent / f"{db_path.name}-shm"
-        if shm_path.exists():
-            shutil.copy2(shm_path, temp_dir_path / f"{db_path.name}-shm")
+        # Copy the main database file and all related files (WAL, SHM, etc.)
+        # using glob pattern to catch all associated files
+        for file_path in db_path.parent.glob(f"{db_path.name}*"):
+            shutil.copy2(file_path, temp_dir_path / file_path.name)
 
         # Connect to the copied database
+        temp_db_path = temp_dir_path / db_path.name
         conn = sqlite3.connect(temp_db_path)
 
         try:
