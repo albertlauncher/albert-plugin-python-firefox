@@ -278,7 +278,7 @@ class Plugin(PluginInstance, IndexQueryHandler):
                                                                        makeIconifiedIcon(makeImageIcon(p)),
                                                                        1.0, .7)
             else:
-                icon_factory = lambda p=favicon_path: makeComposedIcon(self.firefox_icon_factory(),
+                icon_factory = lambda: makeComposedIcon(self.firefox_icon_factory(),
                                                                        makeGraphemeIcon("🌐"),
                                                                        1.0, .7)
             item = StandardItem(
