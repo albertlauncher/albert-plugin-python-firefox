@@ -10,7 +10,7 @@ from typing import List, Tuple
 
 from albert import *
 
-md_iid = "4.0"
+md_iid = "5.0"
 md_version = "1.0"
 md_name = "Firefox"
 md_description = "Access Firefox bookmarks and history"
