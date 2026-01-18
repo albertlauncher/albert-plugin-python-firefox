@@ -161,10 +161,10 @@ class Plugin(PluginInstance, IndexQueryHandler):
         match platform.system():
             case "Darwin":
                 self.firefox_data_dir = Path.home() / "Library" / "Application Support" / "Firefox"
-                self.firefox_icon_factory = lambda: makeFileTypeIcon("/Applications/Firefox.app")
+                self.firefox_icon_factory = lambda: Icon.fileType("/Applications/Firefox.app")
             case "Linux":
                 self.firefox_data_dir = Path.home() / ".mozilla" / "firefox"
-                self.firefox_icon_factory = lambda: makeThemeIcon("firefox")
+                self.firefox_icon_factory = lambda: Icon.theme("firefox")
             case _:
                 raise NotImplementedError(f"Unsupported platform: {platform.system()}")
 
@@ -274,12 +274,12 @@ class Plugin(PluginInstance, IndexQueryHandler):
                 favicon_path = favicons_location / f"favicon_{guid}.png"
                 with open(favicon_path, "wb") as f:
                     f.write(favicon_data)
-                icon_factory = lambda p=favicon_path: makeComposedIcon(self.firefox_icon_factory(),
-                                                                       makeIconifiedIcon(makeImageIcon(p)),
+                icon_factory = lambda p=favicon_path: Icon.composed(self.firefox_icon_factory(),
+                                                                       Icon.iconified(Icon.image(p)),
                                                                        1.0, .7)
             else:
-                icon_factory = lambda: makeComposedIcon(self.firefox_icon_factory(),
-                                                                       makeGraphemeIcon("🌐"),
+                icon_factory = lambda: Icon.composed(self.firefox_icon_factory(),
+                                                                       Icon.grapheme("🌐"),
                                                                        1.0, .7)
             item = StandardItem(
                 id=guid,
@@ -306,7 +306,7 @@ class Plugin(PluginInstance, IndexQueryHandler):
                     id=guid,
                     text=title if title else url,
                     subtext=url,
-                    icon_factory=lambda: makeComposedIcon(self.firefox_icon_factory(), makeGraphemeIcon("🕘"), 1.0),
+                    icon_factory=lambda: Icon.composed(self.firefox_icon_factory(), Icon.grapheme("🕘"), 1.0),
                     actions=[
                         Action("open", "Open in Firefox", lambda u=url: openUrl(u)),
                         Action("copy", "Copy URL", lambda u=url: setClipboardText(u)),
