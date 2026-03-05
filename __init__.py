@@ -130,6 +130,50 @@ def get_history(places_db: Path) -> List[Tuple[str, str, str]]:
         return []
 
 
+def get_recent_history(places_db: Path, search: str = "", limit: int = 50) -> List[Tuple[str, str, str]]:
+    """Get history items ordered by most recently visited, optionally filtered by search term.
+
+    :param places_db: Path to the places.sqlite database
+    :param search: Optional search string to filter by title or URL
+    :param limit: Maximum number of results to return
+    """
+    try:
+        with get_connection(places_db) as conn:
+            cursor = conn.cursor()
+
+            if search:
+                cursor.execute("""
+                    SELECT place.guid, place.title, place.url
+                    FROM moz_places place
+                      LEFT JOIN moz_bookmarks bookmark ON place.id = bookmark.fk
+                    WHERE place.hidden = 0
+                      AND place.url IS NOT NULL
+                      AND place.last_visit_date IS NOT NULL
+                      AND bookmark.id IS NULL
+                      AND (place.title LIKE :search OR place.url LIKE :search)
+                    ORDER BY place.last_visit_date DESC
+                    LIMIT :limit
+                """, {"search": f"%{search}%", "limit": limit})
+            else:
+                cursor.execute("""
+                    SELECT place.guid, place.title, place.url
+                    FROM moz_places place
+                      LEFT JOIN moz_bookmarks bookmark ON place.id = bookmark.fk
+                    WHERE place.hidden = 0
+                      AND place.url IS NOT NULL
+                      AND place.last_visit_date IS NOT NULL
+                      AND bookmark.id IS NULL
+                    ORDER BY place.last_visit_date DESC
+                    LIMIT :limit
+                """, {"limit": limit})
+
+            return cursor.fetchall()
+
+    except sqlite3.Error as e:
+        critical(f"Failed to read Firefox recent history: {str(e)}")
+        return []
+
+
 def get_favicons_data(favicons_db: Path) -> dict[str, bytes]:
     """Get all favicon data from the favicons database"""
     try:
@@ -275,6 +319,49 @@ class FirefoxQueryHandler(IndexQueryHandler):
         self.setIndexItems(index_items)
 
 
+class FirefoxHistoryHandler(GeneratorQueryHandler):
+    """Yields Firefox history ordered by most recently visited."""
+
+    def __init__(self, profile_path: Path, icon_factory):
+        """
+        :param profile_path: Path to the Firefox profile directory
+        :param icon_factory: Callable returning the Firefox icon
+        """
+        GeneratorQueryHandler.__init__(self)
+        self.profile_path = profile_path
+        self.icon_factory = icon_factory
+
+    def id(self) -> str:
+        return md_iid + "_history"
+
+    def name(self) -> str:
+        return md_name + " History"
+
+    def description(self) -> str:
+        return "Browse Firefox history ordered by most recently visited"
+
+    def defaultTrigger(self):
+        return "fh "
+
+    def items(self, context: QueryContext):
+        places_db = self.profile_path / "places.sqlite"
+        history = get_recent_history(places_db, search=context.query.strip())
+
+        yield [
+            StandardItem(
+                id=guid,
+                text=title if title else url,
+                subtext=url,
+                icon_factory=lambda: Icon.composed(self.icon_factory(), Icon.grapheme("🕘"), 1.0),
+                actions=[
+                    Action("open", "Open in Firefox", lambda u=url: openUrl(u)),
+                    Action("copy", "Copy URL", lambda u=url: setClipboardText(u)),
+                ],
+            )
+            for guid, title, url in history
+        ]
+
+
 class Plugin(PluginInstance):
     """Owns shared Firefox state and configuration."""
 
@@ -318,8 +405,13 @@ class Plugin(PluginInstance):
         )
         self.handler.updateIndexItems()
 
+        self.history_handler = FirefoxHistoryHandler(
+            profile_path=self.firefox_data_dir / self.current_profile_path,
+            icon_factory=self.firefox_icon_factory,
+        )
+
     def extensions(self):
-        return [self.handler]
+        return [self.handler, self.history_handler]
 
     @property
     def current_profile_path(self):
