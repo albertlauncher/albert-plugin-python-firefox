@@ -16,6 +16,7 @@ Albert will present the entries in frequency order: the more you use a bookmark,
 1. Enable the plugin in `Settings > Plugins` and tick `Firefox Bookmarks`
 2. Configure the plugin by picking the Firefox profile to use and if you want to search in history
 3. The default trigger is `f<space>` ("f" for Firefox), so start typing `f ` in Albert to see your bookmarks and history
+4. For a history-only chronological search use `fh` as trigger ("fh" for Firefox History). Your most recent visited page will show as the first entry.
 
 ## Alternatives
 
