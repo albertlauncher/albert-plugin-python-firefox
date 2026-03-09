@@ -436,6 +436,8 @@ class Plugin(PluginInstance):
     def index_history(self, value):
         self._index_history = value
         self.writeConfig("index_history", value)
+        # Ensure the query handler uses the updated history indexing setting
+        self.handler.index_history = value
         self.handler.updateIndexItems()
 
     def configWidget(self):
