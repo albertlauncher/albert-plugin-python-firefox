@@ -421,6 +421,11 @@ class Plugin(PluginInstance):
     def current_profile_path(self, value):
         self._current_profile_path = value
         self.writeConfig("current_profile_path", value)
+
+        # Update handlers to point to the newly selected profile before reindexing
+        new_profile_path = self.firefox_data_dir / value
+        self.handler.profile_path = new_profile_path
+        self.history_handler.profile_path = new_profile_path
         self.handler.updateIndexItems()
 
     @property
