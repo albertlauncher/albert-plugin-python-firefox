@@ -207,8 +207,8 @@ class FirefoxQueryHandler(IndexQueryHandler):
         """
         :param profile_path: Path to the profile
         :param data_location: Path to the recommended plugin data location to store icons
-        :param icon_factory: Callable that takes a profile path and returns
-        a bytes object
+        :param icon_factory: Callable with no arguments that returns an Icon
+                             to be used for Firefox results
         :param index_history: If true, history is also indexed
         """
         IndexQueryHandler.__init__(self)
