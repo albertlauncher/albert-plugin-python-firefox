@@ -217,7 +217,7 @@ class FirefoxQueryHandler(IndexQueryHandler):
         """
         Returns the extension identifier.
         """
-        return md_iid
+        return md_name
 
     def name(self) -> str:
         """
@@ -326,7 +326,7 @@ class FirefoxHistoryHandler(GeneratorQueryHandler):
         self.icon_factory = icon_factory
 
     def id(self) -> str:
-        return md_iid + "_history"
+        return md_name + "_history"
 
     def name(self) -> str:
         return md_name + " History"
