@@ -141,32 +141,26 @@ def get_recent_history(places_db: Path, search: str = "", limit: int = 50) -> Li
         with get_connection(places_db) as conn:
             cursor = conn.cursor()
 
+            search_clause = "1=1"
+            params: dict = {"limit": limit}
             if search:
-                cursor.execute("""
-                    SELECT place.guid, place.title, place.url
-                    FROM moz_places place
-                      LEFT JOIN moz_bookmarks bookmark ON place.id = bookmark.fk
-                    WHERE place.hidden = 0
-                      AND place.url IS NOT NULL
-                      AND place.last_visit_date IS NOT NULL
-                      AND bookmark.id IS NULL
-                      AND (place.title LIKE :search OR place.url LIKE :search)
-                    ORDER BY place.last_visit_date DESC
-                    LIMIT :limit
-                """, {"search": f"%{search}%", "limit": limit})
-            else:
-                cursor.execute("""
-                    SELECT place.guid, place.title, place.url
-                    FROM moz_places place
-                      LEFT JOIN moz_bookmarks bookmark ON place.id = bookmark.fk
-                    WHERE place.hidden = 0
-                      AND place.url IS NOT NULL
-                      AND place.last_visit_date IS NOT NULL
-                      AND bookmark.id IS NULL
-                    ORDER BY place.last_visit_date DESC
-                    LIMIT :limit
-                """, {"limit": limit})
+                search_clause = "(place.title LIKE :search OR place.url LIKE :search)"
+                params["search"] = f"%{search}%"
 
+            query = f"""
+                SELECT place.guid, place.title, place.url
+                FROM moz_places place
+                  LEFT JOIN moz_bookmarks bookmark ON place.id = bookmark.fk
+                WHERE place.hidden = 0
+                  AND place.url IS NOT NULL
+                  AND place.last_visit_date IS NOT NULL
+                  AND bookmark.id IS NULL
+                  AND {search_clause}
+                ORDER BY place.last_visit_date DESC
+                LIMIT :limit
+            """
+
+            cursor.execute(query, params)
             return cursor.fetchall()
 
     except sqlite3.Error as e:
