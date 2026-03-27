@@ -397,7 +397,6 @@ class Plugin(PluginInstance):
             icon_factory=self.firefox_icon_factory,
             index_history=self._index_history,
         )
-        self.handler.updateIndexItems()
 
         self.history_handler = FirefoxHistoryHandler(
             profile_path=self.firefox_data_dir / self.current_profile_path,
