@@ -131,7 +131,7 @@ def get_history(places_db: Path) -> List[Tuple[str, str, str]]:
         return []
 
 
-def get_recent_history(places_db: Path, search: str = "", limit: int = 50) -> List[Tuple[str, str, str]]:
+def get_recent_history(places_db: Path, search: str = "", limit: int = 1000) -> List[Tuple[str, str, str]]:
     """Get history items ordered by most recently visited, optionally filtered by search term.
 
     :param places_db: Path to the places.sqlite database
