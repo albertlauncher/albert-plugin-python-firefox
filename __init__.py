@@ -6,7 +6,8 @@ import tempfile
 import threading
 from contextlib import contextmanager
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Callable
+from itertools import islice
 
 from albert import *
 
@@ -130,6 +131,44 @@ def get_history(places_db: Path) -> List[Tuple[str, str, str]]:
         return []
 
 
+def get_recent_history(places_db: Path, search: str = "", limit: int = 1000) -> List[Tuple[str, str, str]]:
+    """Get history items ordered by most recently visited, optionally filtered by search term.
+
+    :param places_db: Path to the places.sqlite database
+    :param search: Optional search string to filter by title or URL
+    :param limit: Maximum number of results to return
+    """
+    try:
+        with get_connection(places_db) as conn:
+            cursor = conn.cursor()
+
+            search_clause = "1=1"
+            params: dict = {"limit": limit}
+            if search:
+                search_clause = "(place.title LIKE :search OR place.url LIKE :search)"
+                params["search"] = f"%{search}%"
+
+            query = f"""
+                SELECT place.guid, place.title, place.url
+                FROM moz_places place
+                  LEFT JOIN moz_bookmarks bookmark ON place.id = bookmark.fk
+                WHERE place.hidden = 0
+                  AND place.url IS NOT NULL
+                  AND place.last_visit_date IS NOT NULL
+                  AND bookmark.id IS NULL
+                  AND {search_clause}
+                ORDER BY place.last_visit_date DESC
+                LIMIT :limit
+            """
+
+            cursor.execute(query, params)
+            return cursor.fetchall()
+
+    except sqlite3.Error as e:
+        critical(f"Failed to read Firefox recent history: {str(e)}")
+        return []
+
+
 def get_favicons_data(favicons_db: Path) -> dict[str, bytes]:
     """Get all favicon data from the favicons database"""
     try:
@@ -151,11 +190,185 @@ def get_favicons_data(favicons_db: Path) -> dict[str, bytes]:
         return {}
 
 
-class Plugin(PluginInstance, IndexQueryHandler):
-    def __init__(self):
-        PluginInstance.__init__(self)
+class FirefoxQueryHandler(IndexQueryHandler):
+    """Handles fuzzy search over Firefox bookmarks and optionally history."""
+
+    def __init__(self,
+                 profile_path: Path,
+                 data_location: Path,
+                 icon_factory: Callable[[], Icon],
+                 index_history: bool = False,
+    ):
+        """
+        :param profile_path: Path to the profile
+        :param data_location: Path to the recommended plugin data location to store icons
+        :param icon_factory: Callable with no arguments that returns an Icon
+                             to be used for Firefox results
+        :param index_history: If true, history is also indexed
+        """
         IndexQueryHandler.__init__(self)
         self.thread = None
+
+        self.profile_path = profile_path
+        self.icon_factory = icon_factory
+        self.index_history = index_history
+        self.plugin_data_location = data_location
+
+    def id(self) -> str:
+        """
+        Returns the extension identifier.
+        """
+        return md_name
+
+    def name(self) -> str:
+        """
+        Returns the pretty, human readable extension name.
+        """
+        return md_name
+
+    def description(self) -> str:
+        """
+        Returns the brief extension description.
+        """
+        return md_description
+
+    def __del__(self):
+        if self.thread and self.thread.is_alive():
+            self.thread.join()
+
+    def defaultTrigger(self):
+        return "f "
+
+    def updateIndexItems(self):
+        if self.thread and self.thread.is_alive():
+            self.thread.join()
+        self.thread = threading.Thread(target=self._update_index_items_task)
+        self.thread.start()
+
+    def _update_index_items_task(self):
+        places_db = self.profile_path/ "places.sqlite"
+        favicons_db = self.profile_path / "favicons.sqlite"
+
+        bookmarks = get_bookmarks(places_db)
+        info(f"Found {len(bookmarks)} bookmarks")
+
+        favicons_location = self.plugin_data_location / "favicons"
+        favicons_location.mkdir(exist_ok=True, parents=True)
+
+        for f in favicons_location.glob("*"):
+            f.unlink()
+
+        favicons = get_favicons_data(favicons_db)
+
+        index_items = []
+        seen_urls = set()
+
+        for guid, title, url, url_hash in bookmarks:
+            if url in seen_urls:
+                continue
+            seen_urls.add(url)
+
+            favicon_data = favicons.get(url_hash)
+            if favicon_data:
+                favicon_path = favicons_location / f"favicon_{guid}.png"
+                with open(favicon_path, "wb") as f:
+                    f.write(favicon_data)
+                icon_factory = lambda p=favicon_path: Icon.composed(
+                    self.icon_factory(), Icon.iconified(Icon.image(p)), 1.0, .7)
+            else:
+                icon_factory = lambda: Icon.composed(
+                    self.icon_factory(), Icon.grapheme("🌐"), 1.0, .7)
+
+            item = StandardItem(
+                id=guid,
+                text=title if title else url,
+                subtext=url,
+                icon_factory=icon_factory,
+                actions=[
+                    Action("open", "Open in Firefox", lambda u=url: openUrl(u)),
+                    Action("copy", "Copy URL", lambda u=url: setClipboardText(u)),
+                ],
+            )
+            index_items.append(IndexItem(item=item, string=f"{title} {url}".lower()))
+
+        if self.index_history:
+            history = get_history(places_db)
+            info(f"FirefoxQueryHandler: Found {len(history)} history items")
+            for guid, title, url in history:
+                if url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                item = StandardItem(
+                    id=guid,
+                    text=title if title else url,
+                    subtext=url,
+                    icon_factory=lambda: Icon.composed(
+                        self.icon_factory(), Icon.grapheme("🕘"), 1.0),
+                    actions=[
+                        Action("open", "Open in Firefox", lambda u=url: openUrl(u)),
+                        Action("copy", "Copy URL", lambda u=url: setClipboardText(u)),
+                    ],
+                )
+                index_items.append(IndexItem(item=item, string=f"{title} {url}".lower()))
+
+        self.setIndexItems(index_items)
+
+
+class FirefoxHistoryHandler(GeneratorQueryHandler):
+    """Yields Firefox history ordered by most recently visited."""
+
+    def __init__(self, profile_path: Path, icon_factory):
+        """
+        :param profile_path: Path to the Firefox profile directory
+        :param icon_factory: Callable returning the Firefox icon
+        """
+        GeneratorQueryHandler.__init__(self)
+        self.profile_path = profile_path
+        self.icon_factory = icon_factory
+
+    def id(self) -> str:
+        return md_name + "_history"
+
+    def name(self) -> str:
+        return md_name + " History"
+
+    def description(self) -> str:
+        return "Browse Firefox history ordered by most recently visited"
+
+    def defaultTrigger(self):
+        return "fh "
+
+    def items(self, context: QueryContext):
+        places_db = self.profile_path / "places.sqlite"
+        history = get_recent_history(places_db, search=context.query.strip())
+        info(f"FirefoxHistoryHandler: Found {len(history)} history items.")
+
+        def make_item(guid, title, url):
+            return StandardItem(
+                id=guid,
+                text=title if title else url,
+                subtext=url,
+                icon_factory=lambda: Icon.composed(self.icon_factory(), Icon.grapheme("🕘"), 1.0),
+                actions=[
+                    Action("open", "Open in Firefox", lambda u=url: openUrl(u)),
+                    Action("copy", "Copy URL", lambda u=url: setClipboardText(u)),
+                ],
+            )
+
+        # generator expression, lazy construction later in islice call
+        it = (make_item(guid, title, url) for guid, title, url in history)
+        # The key idea: islice(it, 10) consumes at most 10 items from the iterator each time without
+        # materializing the whole thing, and the walrus operator (:=) stops the loop once islice returns
+        # an empty list.
+        while chunk := list(islice(it, 10)):
+            yield chunk
+
+
+class Plugin(PluginInstance):
+    """Owns shared Firefox state and configuration."""
+
+    def __init__(self):
+        PluginInstance.__init__(self)
 
         # Get the Firefox root directory
         match platform.system():
@@ -186,15 +399,20 @@ class Plugin(PluginInstance, IndexQueryHandler):
             self._index_history = False
             self.writeConfig("index_history", self._index_history)
 
-    def __del__(self):
-        if self.thread and self.thread.is_alive():
-            self.thread.join()
+        self.handler = FirefoxQueryHandler(
+            profile_path=self.firefox_data_dir / self.current_profile_path,
+            data_location=Path(self.dataLocation()),
+            icon_factory=self.firefox_icon_factory,
+            index_history=self._index_history,
+        )
+
+        self.history_handler = FirefoxHistoryHandler(
+            profile_path=self.firefox_data_dir / self.current_profile_path,
+            icon_factory=self.firefox_icon_factory,
+        )
 
     def extensions(self):
-        return [self]
-
-    def defaultTrigger(self):
-        return "f "
+        return [self.handler, self.history_handler]
 
     @property
     def current_profile_path(self):
@@ -204,7 +422,12 @@ class Plugin(PluginInstance, IndexQueryHandler):
     def current_profile_path(self, value):
         self._current_profile_path = value
         self.writeConfig("current_profile_path", value)
-        self.updateIndexItems()
+
+        # Update handlers to point to the newly selected profile before reindexing
+        new_profile_path = self.firefox_data_dir / value
+        self.handler.profile_path = new_profile_path
+        self.history_handler.profile_path = new_profile_path
+        self.handler.updateIndexItems()
 
     @property
     def index_history(self):
@@ -214,7 +437,9 @@ class Plugin(PluginInstance, IndexQueryHandler):
     def index_history(self, value):
         self._index_history = value
         self.writeConfig("index_history", value)
-        self.updateIndexItems()
+        # Ensure the query handler uses the updated history indexing setting
+        self.handler.index_history = value
+        self.handler.updateIndexItems()
 
     def configWidget(self):
         return [
@@ -236,86 +461,3 @@ class Plugin(PluginInstance, IndexQueryHandler):
                 },
             },
         ]
-
-    def updateIndexItems(self):
-        if self.thread and self.thread.is_alive():
-            self.thread.join()
-        self.thread = threading.Thread(target=self.update_index_items_task)
-        self.thread.start()
-
-    def update_index_items_task(self):
-        places_db = self.firefox_data_dir / self.current_profile_path / "places.sqlite"
-        favicons_db = self.firefox_data_dir / self.current_profile_path / "favicons.sqlite"
-
-        bookmarks = get_bookmarks(places_db)
-        info(f"Found {len(bookmarks)} bookmarks")
-
-        # Create favicons directory if it doesn't exist
-        favicons_location = Path(self.dataLocation()) / "favicons"
-        favicons_location.mkdir(exist_ok=True, parents=True)
-
-        # Drop existing favicons
-        for f in favicons_location.glob("*"):
-            f.unlink()
-
-        favicons = get_favicons_data(favicons_db)
-
-        index_items = []
-        seen_urls = set()
-
-        for guid, title, url, url_hash in bookmarks:
-            if url in seen_urls:
-                continue
-            seen_urls.add(url)
-
-            # Search and store the favicon if it exists
-            favicon_data = favicons.get(url_hash)
-            if favicon_data:
-                favicon_path = favicons_location / f"favicon_{guid}.png"
-                with open(favicon_path, "wb") as f:
-                    f.write(favicon_data)
-                icon_factory = lambda p=favicon_path: Icon.composed(self.firefox_icon_factory(),
-                                                                       Icon.iconified(Icon.image(p)),
-                                                                       1.0, .7)
-            else:
-                icon_factory = lambda: Icon.composed(self.firefox_icon_factory(),
-                                                                       Icon.grapheme("🌐"),
-                                                                       1.0, .7)
-            item = StandardItem(
-                id=guid,
-                text=title if title else url,
-                subtext=url,
-                icon_factory=icon_factory,
-                actions=[
-                    Action("open", "Open in Firefox", lambda u=url: openUrl(u)),
-                    Action("copy", "Copy URL", lambda u=url: setClipboardText(u)),
-                ],
-            )
-
-            # Create searchable string for the bookmark
-            index_items.append(IndexItem(item=item, string=f"{title} {url}".lower()))
-
-        if self._index_history:
-            history = get_history(places_db)
-            info(f"Found {len(history)} history items")
-            for guid, title, url in history:
-                if url in seen_urls:
-                    continue
-                seen_urls.add(url)
-                item = StandardItem(
-                    id=guid,
-                    text=title if title else url,
-                    subtext=url,
-                    icon_factory=lambda: Icon.composed(self.firefox_icon_factory(), Icon.grapheme("🕘"), 1.0),
-                    actions=[
-                        Action("open", "Open in Firefox", lambda u=url: openUrl(u)),
-                        Action("copy", "Copy URL", lambda u=url: setClipboardText(u)),
-                    ],
-                )
-
-                # Create searchable string for the history item
-                index_items.append(
-                    IndexItem(item=item, string=f"{title} {url}".lower())
-                )
-
-        self.setIndexItems(index_items)
