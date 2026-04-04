@@ -7,6 +7,7 @@ import threading
 from contextlib import contextmanager
 from pathlib import Path
 from typing import List, Tuple, Callable
+from itertools import islice
 
 from albert import *
 
@@ -292,7 +293,7 @@ class FirefoxQueryHandler(IndexQueryHandler):
 
         if self.index_history:
             history = get_history(places_db)
-            info(f"Found {len(history)} history items")
+            info(f"FirefoxQueryHandler: Found {len(history)} history items")
             for guid, title, url in history:
                 if url in seen_urls:
                     continue
@@ -340,9 +341,10 @@ class FirefoxHistoryHandler(GeneratorQueryHandler):
     def items(self, context: QueryContext):
         places_db = self.profile_path / "places.sqlite"
         history = get_recent_history(places_db, search=context.query.strip())
+        info(f"FirefoxHistoryHandler: Found {len(history)} history items.")
 
-        yield [
-            StandardItem(
+        def make_item(guid, title, url):
+            return StandardItem(
                 id=guid,
                 text=title if title else url,
                 subtext=url,
@@ -352,8 +354,14 @@ class FirefoxHistoryHandler(GeneratorQueryHandler):
                     Action("copy", "Copy URL", lambda u=url: setClipboardText(u)),
                 ],
             )
-            for guid, title, url in history
-        ]
+
+        # generator expression, lazy construction later in islice call
+        it = (make_item(guid, title, url) for guid, title, url in history)
+        # The key idea: islice(it, 10) consumes at most 10 items from the iterator each time without
+        # materializing the whole thing, and the walrus operator (:=) stops the loop once islice returns
+        # an empty list.
+        while chunk := list(islice(it, 10)):
+            yield chunk
 
 
 class Plugin(PluginInstance):
