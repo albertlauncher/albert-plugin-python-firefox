@@ -164,9 +164,9 @@ class Plugin(PluginInstance, IndexQueryHandler):
                 self.firefox_icon_factory = lambda: Icon.fileType("/Applications/Firefox.app")
             case "Linux":
                 # Try XDG-compliant location first, fallback to legacy path
-                new_path = Path.home() / ".config" / "mozilla" / "firefox"
+                xdg_path = Path.home() / ".config" / "mozilla" / "firefox"
                 legacy_path = Path.home() / ".mozilla" / "firefox"
-                self.firefox_data_dir = new_path if (new_path / "profiles.ini").exists() else legacy_path
+                self.firefox_data_dir = xdg_path if xdg_path.exists() else legacy_path
                 self.firefox_icon_factory = lambda: Icon.theme("firefox")
             case _:
                 raise NotImplementedError(f"Unsupported platform: {platform.system()}")
