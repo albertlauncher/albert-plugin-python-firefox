@@ -11,7 +11,7 @@ from itertools import islice
 
 from albert import *
 
-md_iid = "5.0"
+md_iid = "6.0"
 md_version = "1.0.0"
 md_name = "Firefox"
 md_description = "Access Firefox bookmarks and history"
