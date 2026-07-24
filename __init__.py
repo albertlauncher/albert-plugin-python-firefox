@@ -12,7 +12,7 @@ from itertools import islice
 from albert import *
 
 md_iid = "5.0"
-md_version = "1.0.0"
+md_version = "1.1.0"
 md_name = "Firefox"
 md_description = "Access Firefox bookmarks and history"
 md_license = "MIT"
